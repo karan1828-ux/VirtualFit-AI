@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { AppStatus, ImageState } from './types';
+import { AppStatus, ImageState, ProfileMeasurements } from './types';
 import { extractProductImage, imageUrlToBase64 } from './services/extractionService';
 import { generateTryOnImage } from './services/geminiService';
 import Uploader from './components/Uploader';
 import ComparisonSlider from './components/ComparisonSlider';
+import AuthModal from './components/AuthModal';
+import ProfileModal from './components/ProfileModal';
 
 const LOADING_MESSAGES = [
   "Reading fabric textures...",
@@ -14,8 +16,49 @@ const LOADING_MESSAGES = [
   "Applying final lighting...",
 ];
 
+const RECOMMENDED_LOOKS = [
+  {
+    title: 'Urban Streetwear Hoodie',
+    brand: 'Urbanfit',
+    price: '$89.99',
+    image:
+      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80',
+  },
+  {
+    title: 'Classic Denim Jacket',
+    brand: 'Denim Co',
+    price: '$129.99',
+    image:
+      'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=900&q=80',
+  },
+  {
+    title: 'Minimalist White Tee',
+    brand: 'Essential',
+    price: '$39.99',
+    image:
+      'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80',
+  },
+  {
+    title: 'Vintage Leather Bomber',
+    brand: 'Heritage',
+    price: '$159.99',
+    image:
+      'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?auto=format&fit=crop&w=900&q=80',
+  },
+];
+
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profile, setProfile] = useState<ProfileMeasurements>({
+    height: 170,
+    weight: 70,
+    chest: 95,
+    waist: 80,
+    inseam: 80,
+  });
   const [images, setImages] = useState<ImageState>({
     original: null,
     product: null,
@@ -119,195 +162,238 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-gray-900 pb-20 selection:bg-blue-100">
-      <nav className="sticky top-0 z-50 glass border-b border-gray-200/50 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 13V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6m4 8h10a2 2 0 002-2v-6H3v6a2 2 0 002 2z" />
-            </svg>
+    <div className="min-h-screen bg-neutral-50 text-neutral-900 pb-20 selection:bg-neutral-900 selection:text-white">
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] px-6 py-5">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">VirtualFit AI</span>
           </div>
-          <span className="font-bold text-xl tracking-tight">VirtualFit <span className="text-blue-600">AI</span></span>
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => {
+                setAuthMode('signin');
+                setShowAuthModal(true);
+              }}
+                className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => setShowProfileModal(true)}
+                className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+            >
+              Profile
+            </button>
+            <button
+              onClick={reset}
+                className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+            >
+              Reset Session
+            </button>
+          </div>
         </div>
-        <button 
-          onClick={reset}
-          className="text-sm font-semibold text-gray-400 hover:text-gray-900 transition-colors px-4 py-2 hover:bg-gray-100 rounded-full"
-        >
-          Reset Session
-        </button>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-6 pt-12">
-        <header className="text-center mb-12 space-y-4">
-          <div className="inline-block px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-sm">
-            Powered by Gemini 2.5 Flash
+      <main className="max-w-6xl mx-auto px-6 pt-14">
+        <header className="text-center mb-14 space-y-5">
+          <div className="inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">
+            AI Styling Studio
           </div>
-          <h1 className="text-4xl md:text-7xl font-black tracking-tighter text-gray-900 leading-[1.1]">
-            Virtual Fit <br/><span className="text-blue-600">Tailored</span> For You.
+          <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] text-neutral-900">
+            Try-On Studio
           </h1>
-          <p className="text-lg text-gray-500 max-w-xl mx-auto font-medium">
-            Upload your photo, link a garment from Amazon or Zara, and see how you look instantly.
+          <p className="text-neutral-500 max-w-2xl mx-auto">
+            Upload your portrait, add any garment by link or image, and preview your final look with editorial clarity.
           </p>
+          <div className="flex justify-center gap-3 pt-3">
+            <button
+              onClick={() => {
+                setAuthMode('signup');
+                setShowAuthModal(true);
+              }}
+              className="bg-neutral-900 text-white px-6 py-3 rounded-xl text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-black active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
+            >
+              Get Started Free
+            </button>
+            <button
+              onClick={() => {
+                setAuthMode('signin');
+                setShowAuthModal(true);
+              }}
+              className="bg-white text-neutral-700 px-6 py-3 rounded-xl text-[10px] uppercase tracking-[0.2em] font-semibold shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:text-neutral-900 active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
+            >
+              Sign In
+            </button>
+          </div>
         </header>
 
         {status === AppStatus.SUCCESS && images.generated && images.original ? (
           <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in zoom-in duration-700">
             <ComparisonSlider before={images.original} after={images.generated} />
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button 
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
                 onClick={handleDownload}
-                className="bg-gray-900 hover:bg-black text-white px-10 py-5 rounded-2xl font-bold shadow-2xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2"
+                className="bg-neutral-900 hover:bg-black text-white px-8 py-4 rounded-xl text-sm uppercase tracking-[0.2em] font-medium active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
                 Download Result
               </button>
-              <button 
+              <button
                 onClick={reset}
-                className="bg-white border border-gray-200 text-gray-700 px-10 py-5 rounded-2xl font-bold hover:bg-gray-50 transition-all shadow-sm"
+                className="bg-white text-neutral-700 px-8 py-4 rounded-xl text-sm uppercase tracking-[0.2em] font-medium shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:text-neutral-900 active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
               >
                 Try Another Outfit
               </button>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
-            <div className="space-y-6">
-              <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">
-                <span className="w-7 h-7 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xs shadow-md">1</span>
-                Upload Your Photo
-              </h2>
-              <Uploader 
-                label="Clear, front-facing portrait"
-                preview={images.original}
-                onUpload={(b) => setImages(p => ({ ...p, original: b }))}
-              />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[340px,1fr] gap-8 max-w-6xl mx-auto">
+            <section className="space-y-6">
+              <div className="bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+                <h2 className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold mb-3">Your Photo</h2>
+                <Uploader
+                  label="Clear front-facing portrait"
+                  preview={images.original}
+                  onUpload={(b) => setImages(p => ({ ...p, original: b }))}
+                />
+              </div>
 
-            <div className="space-y-6">
-              <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">
-                <span className="w-7 h-7 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xs shadow-md">2</span>
-                Choose Garment
-              </h2>
-              <div className="space-y-4">
+              <div className="bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4">
+                <h2 className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">Garment</h2>
                 <div className="flex gap-2">
-                  <input 
+                  <input
                     type="text"
-                    placeholder="Paste product link here..."
-                    className="flex-1 bg-white border border-gray-200 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm font-medium text-sm placeholder:text-gray-300"
+                    placeholder="Paste Amazon, Zara, etc link"
+                    className="flex-1 bg-neutral-50 rounded-xl px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 border-b border-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/10"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                   />
-                  <button 
+                  <button
                     onClick={handleFetchProduct}
                     disabled={!url || status === AppStatus.EXTRACTING}
-                    className="bg-blue-600 text-white px-8 rounded-2xl font-bold hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg shadow-blue-100 flex items-center justify-center min-w-[100px]"
+                    className="bg-neutral-900 text-white px-5 rounded-xl text-[10px] uppercase tracking-[0.2em] font-semibold disabled:opacity-40 active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
                   >
-                    {status === AppStatus.EXTRACTING ? (
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : 'Fetch'}
+                    {status === AppStatus.EXTRACTING ? 'Fetching' : 'Fetch'}
                   </button>
                 </div>
 
-                <div className="flex justify-center">
-                   <button 
-                     onClick={() => garmentInputRef.current?.click()}
-                     className="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest transition-colors flex items-center gap-2 py-1"
-                   >
-                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                     </svg>
-                     Or Upload Manually (Recommended for Amazon)
-                   </button>
-                   <input 
-                     type="file" 
-                     ref={garmentInputRef} 
-                     className="hidden" 
-                     accept="image/*" 
-                     onChange={handleManualGarmentUpload} 
-                   />
-                </div>
-                
-                <div className="relative w-full aspect-square rounded-3xl border border-gray-200 bg-white shadow-sm flex items-center justify-center overflow-hidden transition-all group">
+                <button
+                  onClick={() => garmentInputRef.current?.click()}
+                  className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+                >
+                  Or Upload Garment Image
+                </button>
+
+                <input
+                  type="file"
+                  ref={garmentInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleManualGarmentUpload}
+                />
+
+                <div className="relative w-full aspect-square rounded-2xl bg-neutral-100 flex items-center justify-center overflow-hidden">
                   {images.product ? (
-                    <img 
-                      src={images.product} 
-                      alt="Product" 
-                      className="w-full h-full object-contain p-6 animate-in fade-in zoom-in duration-500" 
+                    <img
+                      src={images.product}
+                      alt="Product"
+                      className="w-full h-full object-contain p-6 animate-in fade-in zoom-in duration-500"
                     />
                   ) : (
-                    <div className="text-center text-gray-300 p-8 space-y-3">
-                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto transition-transform group-hover:scale-110">
-                        <svg className="w-8 h-8 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                        </svg>
-                      </div>
-                      <p className="text-xs font-bold uppercase tracking-widest opacity-60">Waiting for Garment</p>
+                    <div className="text-center text-neutral-400 p-8 space-y-3">
+                      <svg className="w-8 h-8 mx-auto text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 10-8 0v4M5 9h14l1 12H4L5 9z" />
+                      </svg>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.25em]">Awaiting Garment</p>
                     </div>
                   )}
                 </div>
               </div>
+            </section>
+
+            <section className="bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+              <h2 className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold mb-3">Your Virtual Try-On</h2>
+              <div className="rounded-2xl bg-neutral-100 min-h-[520px] overflow-hidden flex items-center justify-center">
+                {images.generated ? (
+                  <img src={images.generated} alt="Generated Try-on" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-center text-neutral-400 space-y-3 p-10">
+                    <svg className="w-8 h-8 mx-auto text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.25em]">Your generated result appears here</p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                disabled={!images.original || !images.product || status === AppStatus.GENERATING}
+                onClick={handleGenerate}
+                className={`
+                  w-full mt-5 rounded-xl px-6 py-4 text-sm uppercase tracking-[0.2em] font-medium transition-all
+                  ${images.original && images.product
+                    ? 'bg-neutral-900 text-white hover:bg-black active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30'
+                    : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'}
+                `}
+              >
+                {status === AppStatus.GENERATING ? LOADING_MESSAGES[loadIdx] : 'Visualize This Fit'}
+              </button>
+            </section>
+          </div>
+        )}
+
+        {error && (
+          <div ref={errorRef} className="mt-10 p-5 bg-white rounded-2xl text-[11px] uppercase tracking-[0.2em] text-red-500 max-w-3xl mx-auto shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+            {error}
+          </div>
+        )}
+
+        <section className="mt-16">
+          <div className="mb-6 flex items-end justify-between">
+            <div>
+              <h3 className="font-serif text-4xl text-neutral-900">Complete the Look</h3>
+              <p className="text-neutral-500 mt-2">Personalized recommendations curated for your silhouette.</p>
             </div>
           </div>
-        )}
 
-        {status !== AppStatus.SUCCESS && (
-          <div className="mt-16 text-center space-y-8">
-            {error && (
-              <div ref={errorRef} className="p-5 bg-red-50 text-red-600 rounded-3xl text-[11px] font-bold border border-red-100 flex items-center justify-center gap-4 max-w-lg mx-auto shadow-sm animate-in fade-in slide-in-from-top-2">
-                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {RECOMMENDED_LOOKS.map((item) => (
+              <article key={item.title} className="bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+                <img src={item.image} alt={item.title} className="w-full h-64 object-cover" />
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-neutral-900 font-medium">{item.title}</h4>
+                      <p className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 mt-1">{item.brand}</p>
+                    </div>
+                    <p className="text-sm text-neutral-900">{item.price}</p>
+                  </div>
+                  <button className="w-full bg-neutral-900 text-white rounded-xl py-3 text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-black active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30">
+                    Try This On
+                  </button>
                 </div>
-                <span className="text-left leading-relaxed">{error}</span>
-              </div>
-            )}
-            
-            <button 
-              disabled={!images.original || !images.product || status === AppStatus.GENERATING}
-              onClick={handleGenerate}
-              className={`
-                px-20 py-7 rounded-[2rem] text-2xl font-black shadow-2xl transition-all transform
-                ${images.original && images.product 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 hover:-translate-y-1 active:scale-95 shadow-blue-200' 
-                  : 'bg-gray-100 text-gray-300 cursor-not-allowed'}
-              `}
-            >
-              {status === AppStatus.GENERATING ? (
-                <div className="flex flex-col items-center">
-                  <span className="flex items-center gap-3">
-                    <svg className="animate-spin h-6 w-6 text-white" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Dressing You Up...
-                  </span>
-                  <span className="text-xs font-medium opacity-60 mt-1 uppercase tracking-[0.2em]">{LOADING_MESSAGES[loadIdx]}</span>
-                </div>
-              ) : 'Visualize This Fit'}
-            </button>
+              </article>
+            ))}
           </div>
-        )}
+        </section>
       </main>
 
-      <footer className="mt-32 border-t border-gray-100 pt-16 pb-24 text-center">
-        <div className="max-w-4xl mx-auto space-y-6 opacity-40">
-           <div className="flex justify-center gap-8 text-gray-400">
-             <span className="font-bold tracking-[0.3em] text-[10px]">AMAZON</span>
-             <span className="font-bold tracking-[0.3em] text-[10px]">ZARA</span>
-             <span className="font-bold tracking-[0.3em] text-[10px]">H&M</span>
-             <span className="font-bold tracking-[0.3em] text-[10px]">MYNTRA</span>
-           </div>
-           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
-             VirtualFit AI Studio &copy; 2024 — High Precision Neural Rendering
-           </p>
-        </div>
-      </footer>
+      <AuthModal
+        open={showAuthModal}
+        mode={authMode}
+        onClose={() => setShowAuthModal(false)}
+        onModeChange={setAuthMode}
+        onSubmit={() => {
+          setShowAuthModal(false);
+          if (authMode === 'signup') setShowProfileModal(true);
+        }}
+      />
+
+      <ProfileModal
+        open={showProfileModal}
+        profile={profile}
+        onClose={() => setShowProfileModal(false)}
+        onChange={setProfile}
+      />
     </div>
   );
 };

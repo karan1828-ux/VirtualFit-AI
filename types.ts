@@ -11,6 +11,14 @@ export interface ExtractionResult {
   error?: string;
 }
 
+export interface ProfileMeasurements {
+  height: number;
+  weight: number;
+  chest: number;
+  waist: number;
+  inseam: number;
+}
+
 export enum AppStatus {
   IDLE = 'IDLE',
   EXTRACTING = 'EXTRACTING',
