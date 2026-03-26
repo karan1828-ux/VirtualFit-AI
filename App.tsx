@@ -49,6 +49,8 @@ const RECOMMENDED_LOOKS = [
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authUser, setAuthUser] = useState<{ id: number; email: string } | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -69,6 +71,45 @@ const App: React.FC = () => {
   const [loadIdx, setLoadIdx] = useState(0);
   const garmentInputRef = useRef<HTMLInputElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
+
+  const refreshAuth = async () => {
+    try {
+      setAuthLoading(true);
+      const resp = await fetch('/api/auth/me', { credentials: 'include' });
+      if (!resp.ok) {
+        setAuthUser(null);
+        return;
+      }
+      const payload = (await resp.json()) as { id: number; email: string };
+      setAuthUser(payload);
+    } catch {
+      setAuthUser(null);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      // ignore
+    }
+    setShowAuthModal(false);
+    setShowProfileModal(false);
+    setAuthUser(null);
+    reset();
+  };
+
+  const handleGoogleSignIn = () => {
+    // Uses backend OAuth endpoint; browser will be redirected to Google, then back.
+    window.location.href = '/api/auth/google';
+  };
 
   // Cycle through loading messages
   useEffect(() => {
@@ -169,93 +210,141 @@ const App: React.FC = () => {
             <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">VirtualFit AI</span>
           </div>
           <div className="flex items-center gap-6">
-            <button
-              onClick={() => {
-                setAuthMode('signin');
-                setShowAuthModal(true);
-              }}
-                className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => setShowProfileModal(true)}
-                className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
-            >
-              Profile
-            </button>
-            <button
-              onClick={reset}
-                className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
-            >
-              Reset Session
-            </button>
+            {authUser ? (
+              <>
+                <button
+                  onClick={() => setShowProfileModal(true)}
+                  className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+                >
+                  Profile
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+                >
+                  Logout
+                </button>
+                <button
+                  onClick={reset}
+                  className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+                >
+                  Reset Session
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setAuthMode('signin');
+                    setShowAuthModal(true);
+                  }}
+                  className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setShowAuthModal(true);
+                  }}
+                  className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+                >
+                  Sign Up
+                </button>
+              </>
+            )}
           </div>
         </div>
       </nav>
 
       <main className="max-w-6xl mx-auto px-6 pt-14">
-        <header className="text-center mb-14 space-y-5">
-          <div className="inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">
-            AI Styling Studio
+        {authLoading ? (
+          <div className="py-24 text-center">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">Loading</div>
           </div>
-          <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] text-neutral-900">
-            Try-On Studio
-          </h1>
-          <p className="text-neutral-500 max-w-2xl mx-auto">
-            Upload your portrait, add any garment by link or image, and preview your final look with editorial clarity.
-          </p>
-          <div className="flex justify-center gap-3 pt-3">
-            <button
-              onClick={() => {
-                setAuthMode('signup');
-                setShowAuthModal(true);
-              }}
-              className="bg-neutral-900 text-white px-6 py-3 rounded-xl text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-black active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
-            >
-              Get Started Free
-            </button>
-            <button
-              onClick={() => {
-                setAuthMode('signin');
-                setShowAuthModal(true);
-              }}
-              className="bg-white text-neutral-700 px-6 py-3 rounded-xl text-[10px] uppercase tracking-[0.2em] font-semibold shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:text-neutral-900 active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
-            >
-              Sign In
-            </button>
-          </div>
-        </header>
-
-        {status === AppStatus.SUCCESS && images.generated && images.original ? (
-          <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in zoom-in duration-700">
-            <ComparisonSlider before={images.original} after={images.generated} />
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        ) : !authUser ? (
+          <header className="text-center mb-14 space-y-5">
+            <div className="inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">
+              VirtualFit AI
+            </div>
+            <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] text-neutral-900">
+              Editorial Try-On
+            </h1>
+            <p className="text-neutral-500 max-w-2xl mx-auto">
+              Sign in or create an account to drop your photo, visualize a garment, and save your look.
+            </p>
+            <div className="flex justify-center gap-3 pt-3">
               <button
-                onClick={handleDownload}
-                className="bg-neutral-900 hover:bg-black text-white px-8 py-4 rounded-xl text-sm uppercase tracking-[0.2em] font-medium active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
+                onClick={() => {
+                  setAuthMode('signup');
+                  setShowAuthModal(true);
+                }}
+                className="bg-neutral-900 text-white px-6 py-3 rounded-xl text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-black active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
               >
-                Download Result
+                Create Account
               </button>
               <button
-                onClick={reset}
-                className="bg-white text-neutral-700 px-8 py-4 rounded-xl text-sm uppercase tracking-[0.2em] font-medium shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:text-neutral-900 active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
+                onClick={() => {
+                  setAuthMode('signin');
+                  setShowAuthModal(true);
+                }}
+                className="bg-white text-neutral-700 px-6 py-3 rounded-xl text-[10px] uppercase tracking-[0.2em] font-semibold shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:text-neutral-900 active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
               >
-                Try Another Outfit
+                Sign In
               </button>
             </div>
-          </div>
+            <div className="pt-4">
+              <button
+                onClick={handleGoogleSignIn}
+                className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 hover:text-neutral-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20 rounded-md"
+              >
+                Continue with Google
+              </button>
+            </div>
+          </header>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[340px,1fr] gap-8 max-w-6xl mx-auto">
-            <section className="space-y-6">
-              <div className="bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-                <h2 className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold mb-3">Your Photo</h2>
-                <Uploader
-                  label="Clear front-facing portrait"
-                  preview={images.original}
-                  onUpload={(b) => setImages(p => ({ ...p, original: b }))}
-                />
+          <>
+            <header className="text-center mb-14 space-y-5">
+              <div className="inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">
+                AI Styling Studio
               </div>
+              <h1 className="font-serif text-5xl md:text-7xl leading-[1.05] text-neutral-900">
+                Try-On Studio
+              </h1>
+              <p className="text-neutral-500 max-w-2xl mx-auto">
+                Upload your portrait, add any garment by link or image, and preview your final look with editorial clarity.
+              </p>
+            </header>
+
+            {status === AppStatus.SUCCESS && images.generated && images.original ? (
+              <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in zoom-in duration-700">
+                <ComparisonSlider before={images.original} after={images.generated} />
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={handleDownload}
+                    className="bg-neutral-900 hover:bg-black text-white px-8 py-4 rounded-xl text-sm uppercase tracking-[0.2em] font-medium active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
+                  >
+                    Download Result
+                  </button>
+                  <button
+                    onClick={reset}
+                    className="bg-white text-neutral-700 px-8 py-4 rounded-xl text-sm uppercase tracking-[0.2em] font-medium shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:text-neutral-900 active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
+                  >
+                    Try Another Outfit
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-[340px,1fr] gap-8 max-w-6xl mx-auto">
+                <section className="space-y-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+                    <h2 className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold mb-3">Your Photo</h2>
+                    <Uploader
+                      label="Clear front-facing portrait"
+                      preview={images.original}
+                      onUpload={(b) => setImages(p => ({ ...p, original: b }))}
+                    />
+                  </div>
 
               <div className="bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4">
                 <h2 className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold">Garment</h2>
@@ -307,8 +396,8 @@ const App: React.FC = () => {
                     </div>
                   )}
                 </div>
-              </div>
-            </section>
+                </div>
+                </section>
 
             <section className="bg-white rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
               <h2 className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-semibold mb-3">Your Virtual Try-On</h2>
@@ -338,43 +427,45 @@ const App: React.FC = () => {
                 {status === AppStatus.GENERATING ? LOADING_MESSAGES[loadIdx] : 'Visualize This Fit'}
               </button>
             </section>
-          </div>
-        )}
+              </div>
+            )}
 
-        {error && (
-          <div ref={errorRef} className="mt-10 p-5 bg-white rounded-2xl text-[11px] uppercase tracking-[0.2em] text-red-500 max-w-3xl mx-auto shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-            {error}
-          </div>
-        )}
+            {error && (
+              <div ref={errorRef} className="mt-10 p-5 bg-white rounded-2xl text-[11px] uppercase tracking-[0.2em] text-red-500 max-w-3xl mx-auto shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+                {error}
+              </div>
+            )}
 
-        <section className="mt-16">
-          <div className="mb-6 flex items-end justify-between">
-            <div>
-              <h3 className="font-serif text-4xl text-neutral-900">Complete the Look</h3>
-              <p className="text-neutral-500 mt-2">Personalized recommendations curated for your silhouette.</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {RECOMMENDED_LOOKS.map((item) => (
-              <article key={item.title} className="bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-                <img src={item.image} alt={item.title} className="w-full h-64 object-cover" />
-                <div className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-neutral-900 font-medium">{item.title}</h4>
-                      <p className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 mt-1">{item.brand}</p>
-                    </div>
-                    <p className="text-sm text-neutral-900">{item.price}</p>
-                  </div>
-                  <button className="w-full bg-neutral-900 text-white rounded-xl py-3 text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-black active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30">
-                    Try This On
-                  </button>
+            <section className="mt-16">
+              <div className="mb-6 flex items-end justify-between">
+                <div>
+                  <h3 className="font-serif text-4xl text-neutral-900">Complete the Look</h3>
+                  <p className="text-neutral-500 mt-2">Personalized recommendations curated for your silhouette.</p>
                 </div>
-              </article>
-            ))}
-          </div>
-        </section>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {RECOMMENDED_LOOKS.map((item) => (
+                  <article key={item.title} className="bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+                    <img src={item.image} alt={item.title} className="w-full h-64 object-cover" />
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-neutral-900 font-medium">{item.title}</h4>
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-neutral-500 mt-1">{item.brand}</p>
+                        </div>
+                        <p className="text-sm text-neutral-900">{item.price}</p>
+                      </div>
+                      <button className="w-full bg-neutral-900 text-white rounded-xl py-3 text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-black active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30">
+                        Try This On
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
       </main>
 
       <AuthModal
@@ -382,9 +473,24 @@ const App: React.FC = () => {
         mode={authMode}
         onClose={() => setShowAuthModal(false)}
         onModeChange={setAuthMode}
-        onSubmit={() => {
+        onGoogleSignIn={handleGoogleSignIn}
+        onSubmit={async (data) => {
+          const endpoint = authMode === 'signup' ? '/api/auth/register' : '/api/auth/login';
+          const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email: data.email, password: data.password }),
+          });
+
+          const payload = await resp.json().catch(() => null);
+          if (!resp.ok) {
+            throw new Error(payload?.error || 'Authentication failed. Please try again.');
+          }
+
           setShowAuthModal(false);
-          if (authMode === 'signup') setShowProfileModal(true);
+          setShowProfileModal(false);
+          await refreshAuth();
         }}
       />
 

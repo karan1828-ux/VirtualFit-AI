@@ -1,15 +1,21 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface AuthModalProps {
   open: boolean;
   mode: 'signin' | 'signup';
   onClose: () => void;
   onModeChange: (mode: 'signin' | 'signup') => void;
-  onSubmit: () => void;
+  onSubmit: (data: { email: string; password: string; fullName?: string }) => Promise<void>;
+  onGoogleSignIn: () => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ open, mode, onClose, onModeChange, onSubmit }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ open, mode, onClose, onModeChange, onSubmit, onGoogleSignIn }) => {
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -27,6 +33,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, mode, onClose, onModeChange
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setSubmitting(false);
+    // Keep entered values across mode toggles, but clear on open.
+    setPassword('');
+  }, [open, mode]);
 
   if (!open) return null;
 
@@ -62,6 +76,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, mode, onClose, onModeChange
           </p>
         </div>
 
+        <button
+          onClick={onGoogleSignIn}
+          className="w-full border border-neutral-200 bg-white/70 rounded-xl py-3 text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-white active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/20"
+          type="button"
+        >
+          Continue with Google
+        </button>
+
         <div className="space-y-5">
           {mode === 'signup' && (
             <label className="block">
@@ -70,6 +92,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, mode, onClose, onModeChange
                 ref={firstInputRef}
                 type="text"
                 placeholder="John Doe"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
                 className="w-full bg-neutral-50 rounded-xl px-4 py-3 border-b border-neutral-200 outline-none text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-neutral-900/10"
               />
             </label>
@@ -80,6 +104,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, mode, onClose, onModeChange
               ref={mode === 'signin' ? firstInputRef : undefined}
               type="email"
               placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-neutral-50 rounded-xl px-4 py-3 border-b border-neutral-200 outline-none text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-neutral-900/10"
             />
           </label>
@@ -88,16 +114,36 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, mode, onClose, onModeChange
             <input
               type="password"
               placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-neutral-50 rounded-xl px-4 py-3 border-b border-neutral-200 outline-none text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-neutral-900/10"
             />
           </label>
         </div>
 
+        {error && (
+          <div className="text-[11px] text-red-500 mt-2 px-2 text-center" role="alert">
+            {error}
+          </div>
+        )}
+
         <button
-          onClick={onSubmit}
-          className="w-full mt-7 bg-neutral-900 text-white rounded-xl py-3.5 text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-black active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
+          onClick={async () => {
+            setError(null);
+            setSubmitting(true);
+            try {
+              await onSubmit({ email, password, fullName: mode === 'signup' ? fullName : undefined });
+            } catch (e: any) {
+              setError(e?.message || 'Authentication failed. Please try again.');
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+          disabled={submitting || !email || !password || (mode === 'signup' && !fullName)}
+          className="w-full mt-7 bg-neutral-900 text-white rounded-xl py-3.5 text-[10px] uppercase tracking-[0.2em] font-semibold hover:bg-black active:scale-[0.99] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30 disabled:opacity-40 disabled:cursor-not-allowed"
+          type="button"
         >
-          {mode === 'signup' ? 'Create Account' : 'Sign In'}
+          {submitting ? 'Please wait...' : mode === 'signup' ? 'Create Account' : 'Sign In'}
         </button>
 
         <p className="mt-6 text-center text-neutral-500">

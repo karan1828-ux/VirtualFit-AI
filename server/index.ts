@@ -1,72 +1,50 @@
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import session from 'express-session';
+import passport from 'passport';
+import { authRouter } from './auth/routes.js';
 import { z } from 'zod';
 import { ApiError } from './services/errors.js';
-import { generateTryOnImage } from './services/gemini.js';
-import { scrapeProductImage } from './services/scraper.js';
-import { fetchImageAsDataUrl } from './services/imageBase64.js';
+import { ensureAuthSchema } from './auth/db.js';
+import { configurePassport } from './auth/passport.js';
+import { tryOnRouter } from './routes/tryonRoutes.js';
 
 export const app = express();
 const port = Number(process.env.PORT || 8787);
 
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '20mb' }));
 
-const tryOnSchema = z.object({
-  userImageBase64: z.string().min(20),
-  garmentImageBase64: z.string().min(20),
+// Auth foundation (sessions + passport strategies)
+configurePassport();
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'dev_session_secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+    },
+  }),
+);
+app.use(passport.initialize());
+app.use(passport.session());
+
+ensureAuthSchema().catch((err) => {
+  console.error('Failed to initialize auth schema:', err);
 });
 
-const extractSchema = z.object({
-  url: z.string().url(),
-});
-
-const imageToBase64Schema = z.object({
-  url: z.string().url(),
-});
+app.use('/api/auth', authRouter);
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-app.post('/api/extract', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { url } = extractSchema.parse(req.body);
-    const result = await scrapeProductImage(url);
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post('/api/image-base64', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { url } = imageToBase64Schema.parse(req.body);
-    const dataUrl = await fetchImageAsDataUrl(url);
-    res.json({ dataUrl });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post('/api/try-on', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { userImageBase64, garmentImageBase64 } = tryOnSchema.parse(req.body);
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new ApiError(500, 'Missing GEMINI_API_KEY environment variable.');
-
-    const image = await generateTryOnImage({
-      apiKey,
-      userImageBase64,
-      garmentImageBase64,
-    });
-
-    res.json({ image });
-  } catch (error) {
-    next(error);
-  }
-});
+app.use('/api', tryOnRouter);
 
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
   if (error instanceof z.ZodError) {
